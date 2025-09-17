@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Collisions</title>
+    <style>
+        :root { color-scheme: dark; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            display: grid;
+            place-items: center;
+            background: #05060a;
+        }
+        canvas {
+            background: #05060a;
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="cv" width="960" height="540"></canvas>
+    <script>
+        (() => {
+            const canvas = document.getElementById("cv");
+            const ctx = canvas.getContext("2d");
+
+            const PAD = 180;
+            const FLOOR_OFF = 80;
+            const WALL_THICK = 3;
+            const WALL_COLOR = "#00eaff";
+
+            function drawWalls() {
+                const W = canvas.width;
+                const H = canvas.height;
+                const innerL = PAD;
+                const innerR = W - PAD;
+                const floorY = H - FLOOR_OFF;
+
+                ctx.save();
+
+                ctx.lineWidth = WALL_THICK;
+                ctx.strokeStyle = WALL_COLOR;
+                ctx.shadowColor = WALL_COLOR;
+                ctx.shadowBlur = 16;
+
+                // left wall
+                ctx.beginPath();
+                ctx.moveTo(innerL, 20);
+                ctx.lineTo(innerL, floorY);
+                ctx.stroke();
+
+                // right wall
+                ctx.beginPath();
+                ctx.moveTo(innerR, 20);
+                ctx.lineTo(innerR, floorY);
+                ctx.stroke();
+
+                // floor
+                ctx.beginPath();
+                ctx.moveTo(innerL, floorY);
+                ctx.lineTo(innerR, floorY);
+                ctx.stroke();
+
+                ctx.restore();
+            }
+
+            function makeCube(x, size, vx, color) {
+                return { x, size, vx, color, mass: size * size };
+            }
+
+            function drawCube(c) {
+                const H = canvas.height;
+                const y = H - FLOOR_OFF - c.size;
+                
+                ctx.save();
+                ctx.fillStyle = c.color;
+                ctx.shadowColor = c.color;
+                ctx.shadowBlur = 24;
+
+                ctx.fillRect(c.x, y, c.size, c.size);
+                ctx.restore();
+            }
+
+            // cubes
+            let A, B;
+
+            function step(dt) {
+                const W = canvas.width;
+                const innerL = PAD;
+                const innerR = W - PAD;
+
+                if (A) A.x += A.vx * dt;
+                if (B) B.x += B.vx * dt;
+
+                if (A) {
+                    const minA = innerL;
+                    const maxA = innerR - A.size;
+
+                    if (A.x < minA) {
+                        A.x = minA;
+                        A.vx = -A.vx;
+                    } else if (A.x > maxA) {
+                        A.x = maxA;
+                        A.vx = -A.vx;
+                    }
+                }
+
+                if (B) {
+                    const minB = innerL;
+                    const maxB = innerR - B.size;
+
+                    if (B.x < minB) {
+                        B.x = minB;
+                        B.vx = -B.vx;
+                    } else if (B.x > maxB) {
+                        B.x = maxB;
+                        B.vx = -B.vx;
+                    }
+                }
+
+                if (A && B && A.x + A.size > B.x) {
+                    const contact = (A.x + A.size + B.x) / 2;
+                    A.x = contact - A.size;
+                    B.x = contact;
+
+                    const m1 = A.mass;
+                    const m2 = B.mass;
+
+                    const u1 = A.vx;
+                    const u2 = B.vx;
+
+                    const sum = m1 + m2;
+                    const v1 = ((m1 - m2) / sum) * u1 + (2 * m2 / sum) * u2;
+                    const v2 = (2 * m1 / sum) * u1 + ((m2 - m1) / sum) * u2;
+                    
+                    A.vx = v1;
+                    B.vx = v2;
+                }
+            }
+
+            function render() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                drawWalls();
+                if (A) {
+                    drawCube(A);
+                }
+                if (B) {
+                    drawCube(B);
+                }
+            }
+
+            let last = performance.now();
+            function loop(now) {
+                const dt = Math.min(0.05, (now - last) / 1000);
+                last = now;
+                step(dt);
+                render();
+                requestAnimationFrame(loop);
+            }
+
+            function reset() {
+                const W = canvas.width;
+                const innerL = PAD;
+                const innerR = W - PAD;
+                const span = innerR - innerL;
+
+                const sizeA = 100;
+                A = makeCube(innerL + span * 0.28 - sizeA / 2, sizeA, 150, "#39ff14");
+
+                const sizeB = 56;
+                B = makeCube(innerL + span * 0.72 - sizeB / 2, sizeB, -210, "#ff8a00");
+            }
+
+            function doResize() {
+                const w = Math.min(1100, Math.max(480, window.innerWidth * 0.92));
+                const h = Math.floor(w * 9 / 16);
+
+                canvas.width = w;
+                canvas.height = h;
+
+                reset();
+                render();
+            }
+
+            ctx.globalAlpha = 1;
+            ctx.globalCompositeOperation = "source-over";
+            render();
+
+            addEventListener("resize", doResize);
+            doResize();
+            requestAnimationFrame(loop);
+        })();
+    </script>
+</body>
+</html>
