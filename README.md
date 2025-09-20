@@ -1,4 +1,4 @@
-# Lofi and ASMR Programming Projects
+# Lofi and ASMR Coding Projects
 
 This is a collection of the <u>[**Programmetry**](https://www.youtube.com/@Programmetry)</u> YouTube Channel, featuring lofi and ASMR programming projects that are coded live!
 
