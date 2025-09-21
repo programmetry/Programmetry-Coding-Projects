@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magic 8 Ball</title>
+    <style>
+        
+        body {
+            margin: 0;
+            height: 100vh;
+            display: grid;
+            place-items: center;
+            background: #eef3f7;
+            font-family: Arial, sans-serif;
+        }
+
+        .ball {
+            width: 360px;
+            height: 360px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 30% 30%, #333, #000);
+            display: grid;
+            place-items: center;
+            cursor: pointer;
+        }
+
+        .inner-circle {
+            width: 230px;
+            height: 230px;
+            border-radius: 50%;
+            background: #111;
+            display: grid;
+            place-items: center;
+        }
+
+        .msg {
+            color: white;
+            text-align: center;
+            font-weight: bold;
+            text-transform: uppercase;
+            max-width: 80%;
+            max-height: 60%;
+            opacity: 0;
+        }
+
+        .shake {
+            animation: shake 0.4s;
+        }
+        @keyframes shake {
+            0%      { transform: translateX(0); }
+            20%     { transform: translateX(-8px); }
+            40%     { transform: translateX(8px); }
+            60%     { transform: translateX(-6px); }
+            80%     { transform: translateX(6px); }
+            100%   { transform: translateX(0); }
+        }
+
+        .fadeIn {
+            animation: fadeIn .4s forwards;
+        }
+        @keyframes fadeIn {
+            from { 
+                opacity: 0;
+                transform: scale(0.95);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+    </style>
+</head>
+<body>
+    <div class="ball" id="ball">
+        <div class="inner-circle">
+            <div class="msg" id="msg"></div>
+        </div>
+    </div>
+    <script>
+        const answers = [
+            "It is certain",
+            "It is decidedly so",
+            "Without a doubt",
+            "Yes, definitely",
+            "You may rely on it",
+            "As I see it, yes",
+            "Most likely",
+            "Outlook good",
+            "Yes",
+            "Signs point to yes",
+            "Reply hazy, try again",
+            "Ask again later",
+            "Better not tell you now",
+            "Cannot predict now",
+            "Concentrate and ask again",
+            "Don't count on it",
+            "My reply is no",
+            "My sources say no",
+            "Outlook not so good",
+            "Very doubtful"
+        ];
+
+        const ball = document.getElementById("ball");
+        const msg = document.getElementById("msg");
+
+        function fitText(el) {
+            let size = 22;
+            el.style.fontSize = size + "px";
+            while ((el.scrolWidth > el.clientWidth || el.scrollHeight > el.clientHeight) && size > 10) {
+                size -= 1;
+                el.style.fontSize = size + "px";
+            };
+        };
+
+        function ask() {
+            msg.classList.remove("fadeIn");
+            msg.style.opacity = 0;
+            ball.classList.add("shake");
+            setTimeout(() => {
+                msg.textContent = answers[Math.floor(Math.random() * answers.length)];
+                fitText(msg);
+                msg.classList.add("fadeIn");
+                ball.classList.remove("shake");
+            }, 400);
+        };
+
+        ball.addEventListener("click", ask);
+
+        window.addEventListener("load", () => {
+            msg.textContent = "Ask again later";
+            fitText(msg);
+            msg.style.opacity = 1;
+        });
+    </script>
+</body>
+</html>
