@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Illusion - Lilac Chaser</title>
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            background: #cfcfcf;
+            font-family: sans-serif;
+        }
+
+        body {
+            display: grid;
+            place-items: center;
+        }
+
+        .illusion-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        canvas {
+            width: min(92vmin, 900px);
+            height: min(92vmin, 900px);
+            display: block;
+        }
+
+        .hint {
+            margin-top: 24px;
+            font-size: clamp(18px, 3vmin, 34px);
+            color: #111;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="illusion-container">
+        <canvas id="illusion"></canvas>
+        <div class="hint">Focus on the + in the center. Do you see the green circle?</div>
+    </div>
+    <script>
+        (() => {
+            const canvas = document.getElementById("illusion");
+            const ctx = canvas.getContext("2d", { alpha: false });
+
+            const dotCount = 12;
+            const dotRadius = 28;
+            const fixedRingRadius = 220;
+            const stepMs = 120;
+            const bgColor = "#cfcfcf";
+            const dotColor = "#ff66cc";
+            const crossColor = "#111";
+
+            function resize() {
+                canvas.width = canvas.clientWidth;
+                canvas.height = canvas.clientHeight;
+            }
+
+            let startTime = performance.now();
+
+            addEventListener("resize", resize);
+            resize();
+
+            function drawFrame(t) {
+                const w = canvas.width;
+                const h = canvas.height;
+
+                const cx = w/2;
+                const cy = h/2;
+
+                ctx.fillStyle = bgColor;
+                ctx.fillRect(0, 0, w, h);
+                drawCross(cx, cy);
+
+                const gapIndex = Math.floor((t - startTime) / stepMs) % dotCount;
+                for (let i = 0; i < dotCount; i++) {
+                    if (isAnimating && i === gapIndex) {
+                        continue;
+                    }
+                    const angle = (i / dotCount) * Math.PI * 2 - Math.PI / 2;
+                    const x = cx + fixedRingRadius * Math.cos(angle);
+                    const y = cy + fixedRingRadius * Math.sin(angle);
+                    drawDot(x, y);
+                }
+
+                requestAnimationFrame(drawFrame);
+            }
+
+            function drawDot(x, y) {
+                ctx.beginPath();
+                ctx.arc(x, y, dotRadius, 0, Math.PI * 2);
+
+                ctx.fillStyle = dotColor;
+                ctx.shadowColor = dotColor;
+                ctx.shadowBlur = 10;
+
+                ctx.fill();
+                ctx.shadowBlur = 0;
+            }
+            
+            function drawCross(x, y) {
+                const s = 18;
+                ctx.lineWidth = 2;
+                ctx.strokeStyle = crossColor;
+                ctx.beginPath();
+                ctx.moveTo(x - s, y);
+                ctx.lineTo(x + s, y);
+                ctx.moveTo(x, y - s);
+                ctx.lineTo(x, y + s);
+                ctx.stroke();
+            };
+
+            let isAnimating = true;
+
+            requestAnimationFrame(drawFrame);
+        })();
+    </script>
+</body>
+</html>
