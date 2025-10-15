@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2048</title>
+    <style>
+        :root {
+            --bg: #0e1117;
+            --board: #171b23;
+            --cell: #1f2430;
+            --gap: 12px;
+            --radius: 12px;
+        }
+        html, body {
+            height: 100%;
+            margin: 0;
+        }
+        body {
+            background: var(--bg);
+            color: #e8eefc;
+            font-family: system-ui, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .wrap {
+            width: min(520px, 94vw);
+        }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+        .title {
+            font-weight: 800;
+            font-size: 28px;
+            letter-spacing: 0.3px;
+        }
+        .stats {
+            display: flex;
+            gap: 10px;
+        }
+        .pill {
+            background: #151925;
+            border-radius: 10px;
+            padding: 8px 10px;
+            text-align: center;
+            min-width: 80px;
+        }
+        .pill span {
+            font-size: 11px;
+            opacity: 0.8;
+            display: block;
+        }
+        .pill b {
+            font-size: 18px;
+        }
+        .actions {
+            display: flex;
+            gap: 8px;
+            margin: 8px 0 12px;
+        }
+        button {
+            background: #1d2333;
+            border: 1px solid #2a3350;
+            color: #e8eefc;
+            padding: 8px 12px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        button:hover {
+            filter: brightness(1.08);
+        }
+        .board {
+            position: relative;
+            background: var(--board);
+            border-radius: 16px;
+            padding: 12px;
+            box-shadow: inset 0 0 0 1px #222b46;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--gap);
+        }
+        .cell {
+            background: var(--cell);
+            border-radius: var(--radius);
+            aspect-ratio: 1/1;
+        }
+        .layer {
+            position: absolute;
+            inset: 12px;
+        }
+        .tile {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: var(--radius);
+            font-weight: 800;
+            box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+            transition: transform 0.12s ease-in;
+            user-select: none;
+        }
+        .n2 { background: #e6f0ff; color: #0b0d12; }
+        .n4 { background: #cfe0ff; color: #0b0d12; }
+        .n8 { background: #a9c7ff; color: #0b0d12; }
+        .n16 { background: #84adff; color: #0b0d12; }
+        .n32 { background: #5f93ff; color: #0b0d12; }
+        .n64 { background: #3a78ff; color: #eaf1ff; }
+        .n128 { background: #2d62d6; color: #eaf1ff; }
+        .n256 { background: #244eac; color: #eaf1ff; }
+        .n512 { background: #1b3b83; color: #eaf1ff; }
+        .n1024 { background: #122859; color: #eaf1ff; }
+        .n2048 { background: #f7b538; color: #0b0d12; }
+        .hint {
+            font-size: 12px;
+            opacity: 0.75;
+        }
+
+        .overlay {
+            position: absolute;
+            inset: 12px;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            background: rgba(6, 8, 14, .78);
+            backdrop-filter: blur(2px);
+            border-radius: 16px;
+        }
+        .overlay.show {
+            display: flex;
+        }
+        
+        .dialog {
+            background: #121624;
+            border: 1px solid #2a3350;
+            border-radius: 16px;
+            padding: 18px;
+            width: min(340px, 90%);
+            text-align: center;
+            box-shadow: 0 12px 30px rgba(0, 0, 0, .35);
+        }
+        .dialog h2 {
+            margin: 2px 0 8px;
+            font-size: 22px;
+        }
+        .dialog .scores {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 8px 0 14px;
+        }
+        .dialog .scores .pill {
+            min-width: auto;
+            padding: 10px 12px;
+        }
+        .dialog .scores .pill b {
+            font-size: 20px;
+        }
+        .dialog .actions {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin: 0;
+        }
+        
+    </style>
+</head>
+<body>
+    <div class="wrap" role="application" aria-label="2048 game">
+        <header>
+            <div class="title">2048</div>
+            <div class="stats">
+                <div class="pill">
+                    <span>SCORE</span>
+                    <b id="score">0</b>
+                </div>
+                <div class="pill">
+                    <span>BEST</span>
+                    <b id="best">0</b>
+                </div>
+            </div>
+        </header>
+        <div class="actions">
+            <button id="newBtn">New Game</button>
+            <span class="hint">Use arrows or WASD</span>
+        </div>
+        <div class="board" id="board">
+            <div class="grid" id="grid" aria-hidden="true"></div>
+            <div class="layer" id="layer" aria-live="polite" aria-atomic="true"></div>
+            <div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-labelledby="goTitle">
+                <div class="dialog">
+                    <h2 id="goTitle">Game Over</h2>
+                    <div class="scores">
+                        <div class="pill">
+                            <span>FINAL</span>
+                            <b id="finalScore">0</b>
+                        </div>
+                        <div class="pill">
+                            <span>BEST</span>
+                            <b id="finalBest">0</b>
+                        </div>
+                    </div>
+                    <div class="actions">
+                        <button id="restartBtn">Restart</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <script>
+        const size = 4;
+        const gridEl = document.getElementById("grid");
+        const layerEl = document.getElementById("layer");
+        const scoreEl = document.getElementById("score");
+        const bestEl = document.getElementById("best");
+        const newBtn = document.getElementById("newBtn");
+        const overlayEl = document.getElementById("overlay");
+        const restartBtn = document.getElementById("restartBtn");
+        const finalScoreEl = document.getElementById("finalScore");
+        const finalBestEl = document.getElementById("finalBest");
+
+        let tiles = [];
+        let nextId = 1;
+        let score = 0;
+        let best = Number(localStorage.getItem("best-2048") || "0");
+        let gameOver = false;
+        bestEl.textContent = String(best);
+
+        function setupGrid() {
+            gridEl.innerHTML = "";
+            for (let i = 0; i < size * size; i++) {
+                const c = document.createElement("div");
+                c.className = "cell";
+                gridEl.appendChild(c);
+            }
+        }
+
+        function emptyCells() {
+            const used = new Set(tiles.map(t => t.x + "-" + t.y));
+            const cells = [];
+
+            for (let x = 0; x < size; x++) {
+                for (let y = 0; y < size; y++) {
+                    if (!used.has(x + "-" + y)) {
+                        cells.push({ x, y });
+                    }
+                }
+            }
+
+            return cells;
+        }
+
+        function addRandomTile() {
+            const cells = emptyCells();
+            
+            if (!cells.length) {
+                return;
+            }
+
+            const c = cells[Math.floor(Math.random() * cells.length)];
+            const v = Math.random() < 0.9 ? 2 : 4;
+
+            tiles.push({
+                id: nextId++,
+                value: v,
+                x: c.x,
+                y: c.y
+            });
+        }
+
+        function cellToPixel(x, y) {
+            const rect = layerEl.getBoundingClientRect();
+            const gap = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--gap"));
+            const tileSize = (rect.width - gap * (size - 1)) / size;
+            const tx = x * (tileSize + gap);
+            const ty = y * (tileSize + gap);
+            return { tx, ty, tileSize };
+        }
+
+        function draw(instant = false) {
+            const keep = new Set();
+
+            for (const t of tiles) {
+                let el = document.getElementById("tile-" + t.id);
+                const isNew = !el;
+
+                if (!el) {
+                    el = document.createElement("div");
+                    el.id = "tile-" + t.id;
+                    el.className = "tile n" + t.value;
+                    layerEl.appendChild(el);
+                }
+                if (!el.classList.contains("n" + t.value)) {
+                    el.className = "tile n" + t.value;
+                    el.textContent = "";
+                }
+
+                const p = cellToPixel(t.x, t.y);
+                
+                el.style.width = p.tileSize + "px";
+                el.style.height = p.tileSize + "px";
+                el.style.fontSize = (p.tileSize * 0.42) + "px";
+                el.style.transform = "translate(" + p.tx + "px, " + p.ty + "px)";
+                el.textContent = t.value;
+                el.style.transition = (instant || isNew) ? "none" : "transform .12s ease-in";
+
+                keep.add(el.id);
+            }
+
+            for (const child of Array.from(layerEl.children)) {
+                if (!keep.has(child.id)) {
+                    child.remove();
+                }
+            }
+
+            scoreEl.textContent = score;
+
+            if (score > best) {
+                best = score;
+                localStorage.setItem("best-2048", String(best));
+                bestEl.textContent = String(best);
+            }
+        }
+
+        function reset() {
+            tiles = [];
+            nextId = 1;
+            score = 0;
+            gamoeOver = false;
+            overlayEl.classList.remove("show");
+            scoreEl.textContent = 0;
+            layerEl.innerHTML = "";
+            addRandomTile();
+            addRandomTile();
+            draw(true);
+        }
+
+        function movesAvailable() {
+            if (emptyCells().length) {
+                return true;
+            }
+
+            const at = (x, y) => tiles.find(t => t.x === x && t.y === y);
+
+            for (const t of tiles) {
+                const r = at(t.x + 1, t.y);
+                const d = at(t.x, t.y + 1);
+                if ((r && r.value === t.value) || (d && d.value === t.value)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        function showGameOver() {
+            gameOver = true;
+            finalScoreEl.textContent = String(score);
+            finalBestEl.textContent = String(best);
+            overlayEl.classList.add("show");
+        }
+
+        function move(dir) {
+            const vecs = [
+                { x: -1, y: 0 },
+                { x: 0, y: -1 },
+                { x: 1, y: 0 },
+                { x: 0, y: 1 },
+            ];
+
+            const v = vecs[dir];
+            const xs = [...Array(size).keys()];
+            const ys = [...Array(size).keys()];
+            const tx = v.x > 0 ? xs.slice().reverse() : xs;
+            const ty = v.y > 0 ? ys.slice().reverse() : ys;
+
+            const at = (x, y) => tiles.find(t => t.x === x && t.y === y);
+            let moved = false;
+
+            for (const y of ty) {
+                for (const x of tx) {
+                    const t = at(x, y);
+
+                    if (!t) {
+                        continue;
+                    }
+
+                    let nx = x;
+                    let ny = y;
+
+                    while (true) {
+                        const px = nx + v.x;
+                        const py = ny + v.y;
+
+                        if (px < 0 || py < 0 || px >= size || py >= size) {
+                            break;
+                        }
+
+                        const o = at(px, py);
+
+                        if (!o) {
+                            nx = px;
+                            ny = py;
+                            continue;
+                        }
+
+                        if (o.value === t.value && !o.merged && !t.merged) {
+                            nx = px;
+                            ny = py;
+                        }
+
+                        break;
+                    }
+
+                    if (nx === x && ny === y) {
+                        continue;
+                    }
+
+                    const target = at(nx, ny);
+
+                    if (target && target.value === t.value && !target.merged && !t.merged) {
+                        target.value *= 2;
+                        target.merged = true;
+                        tiles = tiles.filter(k => k.id !== t.id);
+                        score += target.value;
+                        moved = true;
+                    } else {
+                        t.x = nx;
+                        t.y = ny;
+                        moved = true;
+                    }
+                }
+            }
+
+            tiles.forEach(t => t.merged = false);
+
+            if (moved) {
+                addRandomTile();
+                draw();
+
+                if (!movesAvailable()) {
+                    showGameOver();
+                }
+            }
+        }
+
+        function onKey(e) {
+            const map = {
+                ArrowLeft: 0, 
+                ArrowUp: 1,
+                ArrowRight: 2,
+                ArrowDown: 3,
+                a: 0,
+                w: 1,
+                d: 2,
+                s: 3,
+                A: 0,
+                W: 1,
+                D: 2,
+                S: 3
+            };
+
+            const d = map[e.key];
+            if (d === undefined) {
+                return;
+            }
+
+            e.preventDefault();
+            move(d);
+        }
+
+        let touchX = 0;
+        let touchY = 0;
+
+        const swipeMin = 24;
+
+        function onTouchStart(e) {
+            const t = e.changedTouches[0];
+            touchX = t.clientX;
+            touchY = t.clientY;
+        }
+
+        function onTouchEnd(e) {
+            const t = e.changedTouches[0];
+            const dx = t.clientX - touchX;
+            const dy = t.clientY - touchY;
+
+            if (Math.max(Math.abs(dx), Math.abs(dy)) < swipeMin) {
+                return;
+            }
+
+            if (Math.abs(dx) > Math.abs(dy)) {
+                move(dx > 0 ? 2 : 0);
+            } else {
+                move(dy > 0 ? 3 : 1);
+            }
+        }
+
+        function init() {
+            setupGrid();
+            reset();
+            window.addEventListener("keydown", onKey);
+            layerEl.addEventListener("touchstart", onTouchStart);
+            layerEl.addEventListener("touchend", onTouchEnd);
+            newBtn.addEventListener("click", reset);
+            restartBtn.addEventListener("click", reset);
+            new ResizeObserver(() => draw(true)).observe(document.getElementById("board"));
+        }
+
+        init();
+    </script>
+</body>
+</html>
