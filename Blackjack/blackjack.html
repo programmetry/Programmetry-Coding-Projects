@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Blackjack</title>
+    <style>
+        body {
+            background-color: #0f5132;
+            color: white;
+            font-family: sans-serif;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 20px;
+        }
+
+        #game {
+            margin: 20px auto;
+            max-width: 600px;
+            background: #145a32;
+            padding: 20px 20px 40px 20px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px #000;
+            overflow: visible;
+        }
+
+        .hand {
+            margin: 10px 0;
+            min-height: 160px;
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .card {
+            position: relative;
+            width: 90px;
+            height: 130px;
+            background: white;
+            border-radius: 10px;
+            margin: 8px;
+            box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+            font-family: 'Segoe UI Symbol', sans-serif;
+        }
+
+        .card.red {
+            color: #c0392b;
+        }
+
+        .card.black {
+            color: #000;
+        }
+
+        .corner {
+            position: absolute;
+            font-weight: bold;
+            font-size: 20px;
+            text-align: center;
+            line-height: 1.1;
+        }
+
+        .top-left {
+            top: 6px;
+            left: 8px;
+        }
+
+        .bottom-right {
+            bottom: 6px;
+            right: 8px;
+            transform: rotate(180deg);
+        }
+
+        .center-suit {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 40px;
+            opacity: 0.25;
+        }
+
+        button {
+            margin: 6px;
+            padding: 10px 18px;
+            border: none;
+            border-radius: 6px;
+            background: #198754;
+            color: white;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        input[type=number] {
+            padding: 6px;
+            border-radius: 6px;
+            border: none;
+            width: 80px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .stats {
+            margin-top: 10px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <h1>Blackjack</h1>
+    <div id="game">
+        <div><strong>Bank:</strong> $<span id="bank">1000</span></div>
+        <div><strong>Bet:</strong> <input type="number" id="bet" value="50" min="1"> <button id="deal">Deal</button></div>
+
+        <h3>Dealer</h3>
+        <div id="dealer-hand" class="hand"></div>
+        <div id="dealer-total"></div>
+
+        <h3>Player</h3>
+        <div id="player-hand" class="hand"></div>
+        <div id="player-total"></div>
+
+        <div>
+            <button id="hit" disabled>Hit</button>
+            <button id="stand" disabled>Stand</button>
+
+            <button id="ai-train">Train AI</button>
+            <button id="ai-play-one" disabled>AI Play 1 Round</button>
+            <button id="ai-auto" disabled>AI Auto Play</button>
+            <button id="ai-stop" disabled>Stop AI Auto Play</button>
+            <button id="ai-view" disabled>View AI Values</button>
+        </div>
+
+        <h3 id="message"></h3>
+        <div class="stats">
+            Wins: <span id="wins">0</span> |
+            Losses: <span id="losses">0</span> |
+            Pushes: <span id="pushes">0</span>
+        </div>
+        
+        <div id="ai-status" style="margin-top: 10px; font-size: 14px; opacity: 0.8;"></div>
+
+        <div id="q-overlay">
+            <button id="close-overlay">Close</button>
+            <h2>Learned Q-Values</h2>
+            <pre id="q-values-text"></pre>
+        </div>
+    </div>
+    <script>
+        const deck = [];
+        const suits = ['♠︎', '♥︎', '♦︎', '♣︎'];
+        const ranks = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
+
+        let playerHand = [];
+        let dealerHand = [];
+        let bank = 1000;
+        let bet = 0;
+
+        let wins = 0;
+        let losses = 0;
+        let pushes = 0;
+
+        function createDeck() {
+            deck.length = 0;
+            for (const s of suits) {
+                for (const r of ranks) {
+                    deck.push({r, s})
+                }
+            }
+            deck.sort(() => Math.random() - 0.5);
+        }
+
+        function dealCard(hand) {
+            hand.push(deck.pop());
+        }
+
+        function renderHand(el, hand) {
+            el.innerHTML = '';
+            hand.forEach(c => {
+                const color = ['♥︎', '♦︎'].includes(c.s) ? 'red' : 'black';
+                const cardDiv = document.createElement('div');
+                cardDiv.className = 'card ' + color;
+
+                const tl = document.createElement('div');
+                tl.className = 'corner top-left';
+                tl.textContent = c.r + c.s;
+                cardDiv.append(tl);
+
+                const br = document.createElement('div');
+                br.className = 'corner bottom-right';
+                br.textContent = c.r + c.s;
+                cardDiv.append(br);
+
+                const center = document.createElement('div');
+                center.className = 'center-suit';
+                center.textContent = c.s;
+                cardDiv.append(center);
+
+                el.appendChild(cardDiv);
+            })
+        }
+
+        function cardValue(c) {
+            if (['J', 'Q', 'K'].includes(c.r)) return 10;
+            if (c.r === 'A') return 11;
+            return parseInt(c.r);
+        }
+
+        function handValue(hand) {
+            let val = hand.reduce((a, c) => a + cardValue(c), 0);
+            let aces = hand.filter(c => c.r === 'A').length;
+
+            while (val > 21 && aces > 0) {
+                val -= 10;
+                aces--;
+            }
+            
+            return val;
+        }
+
+        function updateTotals(showDealer = false) {
+            document.getElementById('player-total').textContent = 'Total: ' + handValue(playerHand);
+            if (showDealer) {
+                document.getElementById('dealer-total').textContent = 'Total: ' + handValue(dealerHand);
+            } else {
+                document.getElementById('dealer-total').textContent = 'Total: ?';
+            }
+        }
+
+        function showMessage(msg) {
+            document.getElementById('message').textContent = msg;
+        }
+
+        function updateStats() {
+            document.getElementById('wins').textContent = wins;
+            document.getElementById('losses').textContent = losses;
+            document.getElementById('pushes').textContent = pushes;
+        }
+
+        function endRound(msg) {
+            document.getElementById('hit').disabled = true;
+            document.getElementById('stand').disabled = true;
+            document.getElementById('deal').disabled = false;
+            showMessage(msg);
+            document.getElementById('bank').textContent = bank;
+            updateStats();
+        }
+
+        function deal() {
+            bet = parseInt(document.getElementById('bet').value);
+            if (bet > bank) {
+                showMessage("Not enough money.");
+                return;
+            }
+
+            bank -= bet;
+            createDeck();
+
+            playerHand = [];
+            dealerHand = [];
+
+            dealCard(playerHand);
+            dealCard(dealerHand);
+            dealCard(playerHand);
+            dealCard(dealerHand);
+
+            renderHand(document.getElementById('player-hand'), playerHand);
+            renderHand(document.getElementById('dealer-hand'), [dealerHand[0], {r:'?', s:''}]);
+            updateTotals(false);
+            showMessage('');
+
+            document.getElementById('hit').disabled = false;
+            document.getElementById('stand').disabled = false;
+            document.getElementById('deal').disabled = true;
+
+            if (handValue(playerHand) === 21) {
+                stand();
+            }
+        }
+
+        function hit() {
+            dealCard(playerHand);
+            renderHand(document.getElementById('player-hand'), playerHand);
+            updateTotals(false);
+
+            const val = handValue(playerHand);
+            if (val > 21) {
+                losses++;
+                endRound('Bust! Dealer wins.')
+            }
+        }
+
+        function stand() {
+            while(handValue(dealerHand) < 17) {
+                dealCard(dealerHand);
+            }
+
+            renderHand(document.getElementById('dealer-hand'), dealerHand);
+            updateTotals(true);
+
+            const p = handValue(playerHand);
+            const d = handValue(dealerHand);
+
+            let result = '';
+
+            if (d > 21 || p > d) {
+                bank += bet * 2;
+                result = 'You win!';
+                wins++;
+            } else if (p === d) {
+                bank += bet;
+                result = 'Push.';
+                pushes++;
+            } else {
+                result = 'Dealer wins.';
+                losses++;
+            }
+
+            endRound(result);
+        }
+
+        document.getElementById('deal').onclick = deal;
+        document.getElementById('hit').onclick = hit;
+        document.getElementById('stand').onclick = stand;
+
+        // AI Functionality
+
+        let Q = {};
+        let returns = {};
+        let policy = {};
+        let aiAuto = false;
+
+        function stateKey(playerTotal, dealerCard, usableAce) {
+            return `${playerTotal}-${dealerCard}-${usableAce}`;
+        }
+
+        function simulateEpisode() {
+            createDeck();
+            let ph = [];
+            let dh = [];
+
+            dealCard(ph);
+            dealCard(dh);
+            dealCard(ph);
+            dealCard(dh);
+
+            let episode = [];
+
+            while(true) {
+                const playerVal = handValue(ph);
+                const dealerVal = cardValue(dh[0]);
+                const usableAce = ph.some(c => c.r === 'A' && handValue(ph) <= 21);
+                const state = stateKey(playerVal, dealerVal, usableAce);
+
+                if (playerVal >= 21) {
+                    break;
+                }
+
+                let action = policy[state] ? policy[state] : (Math.random() < 0.5 ? 'hit' : 'stand');
+
+                episode.push({ state, action });
+                if (action === 'hit') {
+                    dealCard(ph);
+                } else {
+                    break;
+                }
+            }
+
+            while (handValue(dh) < 17) {
+                dealCard(dh);
+            }
+
+            const p = handValue(ph);
+            const d = handValue(dh);
+
+            let reward = 0;
+            if (p > 21) reward = -1;
+            else if (d > 21 || p > d) reward = 1;
+            else if (p === d) reward = 0;
+            else reward = -1;
+
+            return { episode, reward };
+        }
+
+        async function trainAI(episodes = 50000) {
+            document.getElementById('ai-status').textContent = 'Training AI...';
+
+            for (let i = 0; i < episodes; i++) {
+                const { episode, reward } = simulateEpisode();
+                const seen = new Set();
+
+                for (const step of episode) {
+                    const key = step.state;
+                    
+                    if (seen.has(`${key}-${step.action}`)) {
+                        continue;
+                    }
+
+                    seen.add(`${key}-${step.action}`);
+
+                    Q[key] ??= { hit: 0, stand: 0 };
+                    returns[key] ??= { hit: [], stand: [] };
+
+                    returns[key][step.action].push(reward);
+
+                    const avg = (
+                        returns[key][step.action].reduce((a, b) => a + b, 0) /
+                        returns[key][step.action].length
+                    );
+
+                    Q[key][step.action] = avg;
+                    policy[key] = (Q[key].hit > Q[key].stand) ? 'hit' : 'stand';
+                }
+
+                if (i % 5000 === 0) {
+                    document.getElementById('ai-status').textContent =
+                        `Training... ${i}/${episodes}`;
+                    await new Promise(r => setTimeout(r, 0));
+                }
+            }
+
+            document.getElementById('ai-status').textContent = 'AI training complete!';
+            document.getElementById('ai-play-one').disabled = false;
+            document.getElementById('ai-auto').disabled = false;
+            document.getElementById('ai-stop').disabled = false;
+            document.getElementById('ai-view').disabled = false;
+        }
+
+        function aiPlayRound(callback) {
+            bet = parseInt(document.getElementById('bet').value);
+
+            if (bank < bet) bank = 1000;
+
+            bank -= bet;
+            document.getElementById('bank').textContent = bank;
+
+            createDeck();
+            playerHand = [];
+            dealerHand = [];
+
+            dealCard(playerHand);
+            dealCard(dealerHand);
+            dealCard(playerHand);
+            dealCard(dealerHand);
+
+            renderHand(document.getElementById('player-hand'), playerHand);
+            renderHand(document.getElementById('dealer-hand'),
+                [dealerHand[0], {r: '?', s: ''}]
+            );
+
+            updateTotals(false);
+
+            async function aiStep() {
+                const pVal = handValue(playerHand);
+                const dCard = cardValue(dealerHand[0]);
+                const usableAce = playerHand.some(c => c.r === 'A' && handValue(playerHand) <= 21);
+                const key = stateKey(pVal, dCard, usableAce);
+                const action = policy[key] || 'stand';
+
+                await new Promise(r => setTimeout(r, 300));
+
+                if (action === 'hit') {
+                    hit();
+                    if (handValue(playerHand) <= 21) aiStep();
+                    else if (callback) callback();
+                } else {
+                    stand();
+                    if (callback) callback();
+                }
+            }
+
+            aiStep();
+        }
+
+        function aiAutoPlay() {
+            aiAuto = true;
+            showMessage('AI Auto Play: Running...');
+            async function loop() {
+                if (!aiAuto) {
+                    showMessage('AI Auto Play: Stopped.');
+                    return;
+                }
+                aiPlayRound(() => setTimeout(loop, 50));
+            }
+            loop();
+        }
+
+        function stopAutoPlay() {
+            aiAuto = false;
+        }
+
+        document.getElementById('ai-view').onclick = () => {
+            let output = '';
+            for (const k in Q) {
+                output += `${k} => hit:${Q[k].hit.toFixed(2)}, stand:${Q[k].stand.toFixed(2)}\n`;
+            }
+            document.getElementById('q-values-text').textContent = output || 'No Q-values yet.';
+            document.getElementById('q-overlay').style.display = 'block';
+        };
+
+        document.getElementById('close-overlay').onclick = () => {
+            document.getElementById('q-overlay').style.display = 'none';
+        };
+
+        document.getElementById('ai-train').onclick = () => trainAI(500000);
+        document.getElementById('ai-play-one').onclick = () => aiPlayRound();
+        document.getElementById('ai-auto').onclick = aiAutoPlay;
+        document.getElementById('ai-stop').onclick = stopAutoPlay;
+    </script>
+</body>
+</html>
